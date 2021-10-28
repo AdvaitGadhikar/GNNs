@@ -6,7 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 
 class GCN_layer(torch.nn.Module):
-    def __init__(self, input_features, output_features, A):
+    def __init__(self, input_features, output_features):
         super(GCN_layer, self).__init__()
 
         self.W = nn.Parameter(torch.empty(input_features, output_features))

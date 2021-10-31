@@ -142,3 +142,38 @@ for i in range(num_epochs):
         val_loss = (1-sim_coeff)*Ls + sim_coeff*Lc
         print('Epoch: %.4f, Validation Loss: %.4f, Fairness Loss: %.4f, Classificn Loss: %.4f, Accuracy: %.4f, AUC: %.4f' %(i, val_loss, Ls, Lc, val_acc, auc))
 
+
+
+"""
+Test the model now
+"""
+
+model.eval()
+emb = model(features.to(device), adj.to(device))
+output = model.classifier(emb)
+counter_features = features.clone()
+counter_features[:, sens_idx] = 1 - counter_features[:, sens_idx]
+counter_output = model.classifier(model(counter_features.to(device), adj.to(device)))
+noisy_features = features.clone() + torch.ones(features.shape).normal_(0, 1).to(device)
+noisy_output = model.classifier(model(noisy_features.to(device), adj.to(device)))
+
+output_preds = torch.argmax(output, dim=1).type_as(labels)
+counter_output_preds = torch.argmax(counter_output, dim=1).type_as(labels)
+noisy_output_preds = torch.argmax(noisy_output, dim=1).type_as(labels)
+
+auc_roc_test = roc_auc_score(labels.cpu().numpy()[idx_test.cpu()], output_preds.detach().cpu().numpy()[idx_test.cpu()])
+counterfactual_fairness = 1 - (output_preds.eq(counter_output_preds)[idx_test].sum().item()/idx_test.shape[0])
+robustness_score = 1 - (output_preds.eq(noisy_output_preds)[idx_test].sum().item()/idx_test.shape[0])
+
+parity, equality = fair_metric(output_preds[idx_test].cpu().numpy(), labels[idx_test].cpu().numpy(), sens[idx_test].numpy())
+f1_s = f1_score(labels[idx_test].cpu().numpy(), output_preds[idx_test].cpu().numpy())
+
+print("The AUCROC of estimator: {:.4f}".format(auc_roc_test))
+print(f'Parity: {parity} | Equality: {equality}')
+print(f'F1-score: {f1_s}')
+print(f'CounterFactual Fairness: {counterfactual_fairness}')
+print(f'Robustness Score: {robustness_score}')
+
+result_list = np.array([auc_roc_test, parity, equality, f1_s, counterfactual_fairness, robustness_score])
+np.save('results_list.npy', result_list, allow_pickle=True)
+
